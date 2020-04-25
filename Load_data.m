@@ -1,4 +1,4 @@
-function [positions, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data()
+function [positions, Step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data()
 
 %% Load files
 Acc_Gyr_Beac_data= readtable('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\11.csv');

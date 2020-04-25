@@ -1,7 +1,8 @@
-import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import scipy.stats
 from filterpy.kalman import KalmanFilter
+from filterpy.monte_carlo import stratified_resample
+from filterpy.monte_carlo import systematic_resample
 
 
 def tracker1(x_initial, R_std, Q_std):
@@ -32,3 +33,10 @@ def rssi_filter(data, R_std, Q_std):
     mu = mu.tolist()
     
     return mu
+
+def calculate_weight(particles_weight, dist, covV, distance_rssi):
+
+    #particles_weights = np.array(particles_weights)
+    particles_weight *= (scipy.stats.norm(dist, covV).pdf(distance_rssi) + 1.e-300)
+
+    return particles_weight
