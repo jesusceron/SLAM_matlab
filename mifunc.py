@@ -34,9 +34,8 @@ def rssi_filter(data, R_std, Q_std):
     
     return mu
 
-def calculate_weight(particles_weight, dist, covV, distance_rssi):
+def calculate_weight(particle_weight, dist, covV, distance_rssi):
 
-    #particles_weights = np.array(particles_weights)
-    particles_weight *= (scipy.stats.norm(dist, covV).pdf(distance_rssi) + 1.e-300)
+    particle_weight *= (scipy.stats.norm(dist, covV).pdf(distance_rssi) + 1.e-300)
 
-    return particles_weight
+    return particle_weight
