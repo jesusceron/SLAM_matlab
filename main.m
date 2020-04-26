@@ -2,8 +2,9 @@ clc;
 clearvars -except positions step_events beac_rssi_fixed beac_rssi_fixed_filtered beac_rssi_activity beac_rssi_activity_filtered
 close all;
 
-%[positions, step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data();
-%step_events = [1, step_events, length(beac_rssi_fixed)]; % Add '0' and the lenght of the dataset as points of support
+participant = 1;
+%[positions, step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data(participant);
+%step_events = [1, step_events, length(beac_rssi_fixed)]; % Add '1' and the lenght of the dataset as points of support
 
 rssi_room_unfiltered = beac_rssi_fixed(:,1);
 rssi_kitchen_unfiltered = beac_rssi_fixed(:,2);
@@ -30,11 +31,11 @@ rssi_brush = beac_rssi_activity_filtered(:,5);
 beacon_fixed = [1,1,1,1,1,1,1,1,1,1];
 
 %% CREATION OF PARTICLES
-N_PARTICLES = 1000;
+N_PARTICLES = 100;
 N_LM = 8;
 LM_SIZE = 2;
-THRESHOLD_RESAMPLE = N_PARTICLES / 10;
-STD_PERSON_POSITION = 0.2;
+THRESHOLD_RESAMPLE = N_PARTICLES / 2;
+STD_PERSON_POSITION = 0.1;
 
 particles = [];
 trajectories = cell(1,N_PARTICLES);
@@ -56,7 +57,7 @@ particles = init_beacons_position(particles,N_PARTICLES);
 x_prev = 0;
 y_prev = 0;
 for i_stride=1:length(positions)
-    display(i_stride)
+    disp(i_stride);
     % PREDICTION
     x = positions(i_stride, 1);
     y = positions(i_stride, 2);
@@ -70,9 +71,9 @@ for i_stride=1:length(positions)
         particles(1,i_particle).T_x = [particles(1,i_particle).T_x, particles(1,i_particle).X];
         particles(1,i_particle).T_y = [particles(1,i_particle).T_y, particles(1,i_particle).Y];
         
-        trajectory_x_data = [particles(1,i_particle).T_x];
-        trajectory_y_data = [particles(1,i_particle).T_y];
-        set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
+%         trajectory_x_data = [particles(1,i_particle).T_x];
+%         trajectory_y_data = [particles(1,i_particle).T_y];
+%         set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
     end    
     x_prev = x;
     y_prev = y;
@@ -100,9 +101,9 @@ for i_stride=1:length(positions)
                     if neff < THRESHOLD_RESAMPLE
                         %indexes = double(py.mifunc.stratified_resample(particles_weights))+1;
                         indexes = double(py.mifunc.systematic_resample(particles_weights))+1;
-                        [particles, particles_weights] = resample_from_index(particles, particles_weights, indexes, N_PARTICLES);
-
+                        [particles, particles_weights, trajectories] = resample_from_index(particles, particles_weights, indexes, N_PARTICLES, trajectories);
                         %particles_weights = ones(1,N_PARTICLES) / N_PARTICLES; % PARTICLES WEIGHTS ARE INITILIZED TO AND EQUAL VALUE
+                        
                     end
 
                 end
@@ -128,7 +129,7 @@ function [particles, particles_weights] = update(particles, rssi, lm_id, particl
         % Get the distance between the person and the landmark
         dx = particles(1,i_particle).X - particles(1,i_particle).Lm(lm_id,1);
         dy = particles(i_particle).Y - particles(i_particle).Lm(lm_id,2);
-        dist = (dx * dx) + (dy * dy);
+        dist = sqrt((dx * dx) + (dy * dy));
         residual = distance_rssi - dist;
 
         % Compute Jacobians
@@ -142,7 +143,7 @@ function [particles, particles_weights] = update(particles, rssi, lm_id, particl
         covV = (HxCov(1) * H(1)) + (HxCov(2) * H(2)) + R;
 
         % Calculate Kalman gain
-        K_gain = [HxCov(1) * (1 / covV), HxCov(1) * (1.0 / covV)];
+        K_gain = [HxCov(1) * (1 / covV), HxCov(2) * (1.0 / covV)];
 
         % Calculate the new landmark position
         lm_x = particles(1,i_particle).Lm(lm_id,1) + (K_gain(1) * residual);
@@ -165,6 +166,9 @@ function [particles, particles_weights] = update(particles, rssi, lm_id, particl
 
         % Update particles weight
         particles_weights(i_particle) = py.mifunc.calculate_weight(particles_weights(i_particle), dist, covV, distance_rssi);
+
+        %particles_weights(i_particle) = (particles_weights(i_particle) * ...
+        %                                (1 / (covV * sqrt(2*pi))) * exp((-(distance_rssi - dist)^2) / (2 * covV^2))) + 1*exp(-300);
     end
     particles_weights = particles_weights / sum(particles_weights);
     for i_particle=1:N_PARTICLES
@@ -172,22 +176,24 @@ function [particles, particles_weights] = update(particles, rssi, lm_id, particl
     end
 end
 
-function [particles, particles_weights] = resample_from_index(particles, particles_weights, indexes, N_PARTICLES)
-    
-    for i_particle = fliplr(linspace(1,N_PARTICLES,N_PARTICLES))
-        %particles(1,i_particle).W = 1 / N_PARTICLES;
-        particles_weights(i_particle) = particles_weights(indexes(i_particle));
-        particles(1,i_particle).X = particles(1,indexes(i_particle)).X;
-        particles(1,i_particle).Y = particles(1,indexes(i_particle)).Y;
-        particles(1,i_particle).Lm = particles(1,indexes(i_particle)).Lm;
-        particles(1,i_particle).LmP = particles(1,indexes(i_particle)).LmP;
-        particles(1,i_particle).T_x = particles(1,indexes(i_particle)).T_x;
-        particles(1,i_particle).T_y = particles(1,indexes(i_particle)).T_y;
+function [new_particles, new_particles_weights, trajectories] = resample_from_index(particles, particles_weights, indexes, N_PARTICLES, trajectories)
+    new_particles_weights = zeros(1,N_PARTICLES);
+    new_particles = particles;
+    for i_particle = 1:N_PARTICLES
+        new_particles_weights(i_particle) = particles_weights(indexes(i_particle));
+        new_particles(1,i_particle) = particles(1,indexes(i_particle));
     end
     
-    particles_weights = particles_weights / sum(particles_weights);
+    new_particles_weights = new_particles_weights / sum(new_particles_weights);
     for i_particle=1:N_PARTICLES
-        particles(1,i_particle).W = particles_weights(i_particle);
+        %new_particles(1,i_particle).W =
+        %new_particles_weights(i_particle);%%        
+        new_particles(1,i_particle).W = 1 / N_PARTICLES;
+        new_particles_weights(i_particle) = 1 / N_PARTICLES;%%
+        
+        trajectory_x_data = [new_particles(1,i_particle).T_x];
+        trajectory_y_data = [new_particles(1,i_particle).T_y];
+        set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
     end
 end
 

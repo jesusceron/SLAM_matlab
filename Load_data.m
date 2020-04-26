@@ -1,16 +1,21 @@
-function [positions, Step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data()
+function [positions, Step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data(participant)
+
 
 %% Load files
-Acc_Gyr_Beac_data= readtable('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\11.csv');
+stance_phase = load(strcat('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\stance_phase_p',int2str(participant),'.mat'));
+Acc_Gyr_Beac_data= readtable(strcat('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\',int2str(participant),'.csv'));
+
+gyro_bias_i_c_s = [820 5500 4000 1 5000 3600 16120 1000 500 4000 1];
+gyro_bias_f_c_s = [1420 7500 8000 7500 6300 4300 17220 3000 2000 5000 3000];
+start_data_sample = [8080 8700 9500 8600 7000 5300 18800 9150 5600 5880 3900];
+final_data_sample = [63930 60200 88900 71200 72400 55450 114800 72600 70000 54630 62720];
+
+gyro_i_c_s = gyro_bias_i_c_s(participant); % initial calibration sample
+gyro_f_c_s = gyro_bias_f_c_s(participant); % initial calibration sample
+
+start_sample = start_data_sample(participant);
+final_sample = final_data_sample(participant);
 fs = 204.8; % IMU sample rate
-stance_phase = load('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\stance_phase_p11.mat');
-
-
-%% THIS CHANGES FOR EACH PARTICIPANT
-gyro_i_c_s = 1; % initial calibration sample
-samples_c = 3000;  % asumo 5 segundos parado (y fs=204.8 Hz)
-start_sample = 3900;
-final_sample = 62720;
 
 %% Load data.
 
@@ -40,7 +45,7 @@ beac_motion = table2array(Acc_Gyr_Beac_data(:,{'motion_state_beacon_6',...
     'motion_state_beacon_10'}));
 
 %% Data pre-processing
-w = gyro_i_c_s : gyro_i_c_s + samples_c;
+w = gyro_i_c_s : gyro_f_c_s;
 
 acc = zeros(length(acc_complete),3);
 acc(:,1) = acc_complete(:,2); 
