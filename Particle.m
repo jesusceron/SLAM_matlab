@@ -18,8 +18,8 @@ classdef Particle
             %   Detailed explanation goes here
             
             obj.W = 1/N_PARTICLES;
-            obj.X = 0;
-            obj.Y = 0;
+            obj.X = 3;
+            obj.Y = 7.5;
             obj.Lm = zeros(N_LM, LM_SIZE);
             obj.LmP = {};
             for i=1:N_LM

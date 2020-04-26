@@ -3,8 +3,15 @@ clearvars -except positions step_events beac_rssi_fixed beac_rssi_fixed_filtered
 close all;
 
 participant = 1;
-%[positions, step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data(participant);
-%step_events = [1, step_events, length(beac_rssi_fixed)]; % Add '1' and the lenght of the dataset as points of support
+
+N_PARTICLES = 200;
+N_LM = 8;
+LM_SIZE = 2;
+THRESHOLD_RESAMPLE = N_PARTICLES / 2;
+STD_PERSON_POSITION = 0.1;
+
+[positions, step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data(participant);
+step_events = [1, step_events, length(beac_rssi_fixed)]; % Add '1' and the lenght of the dataset as points of support
 
 rssi_room_unfiltered = beac_rssi_fixed(:,1);
 rssi_kitchen_unfiltered = beac_rssi_fixed(:,2);
@@ -31,12 +38,6 @@ rssi_brush = beac_rssi_activity_filtered(:,5);
 beacon_fixed = [1,1,1,1,1,1,1,1,1,1];
 
 %% CREATION OF PARTICLES
-N_PARTICLES = 100;
-N_LM = 8;
-LM_SIZE = 2;
-THRESHOLD_RESAMPLE = N_PARTICLES / 2;
-STD_PERSON_POSITION = 0.1;
-
 particles = [];
 trajectories = cell(1,N_PARTICLES);
 particles_weights = ones(1,N_PARTICLES) / N_PARTICLES;
@@ -54,9 +55,9 @@ particles = init_beacons_position(particles,N_PARTICLES);
 
 
 %% MAIN LOOP
-x_prev = 0;
-y_prev = 0;
-for i_stride=1:length(positions)
+x_prev = positions(1, 1);
+y_prev = positions(1, 2);
+for i_stride=2:length(positions)
     disp(i_stride);
     % PREDICTION
     x = positions(i_stride, 1);
@@ -71,15 +72,21 @@ for i_stride=1:length(positions)
         particles(1,i_particle).T_x = [particles(1,i_particle).T_x, particles(1,i_particle).X];
         particles(1,i_particle).T_y = [particles(1,i_particle).T_y, particles(1,i_particle).Y];
         
-%         trajectory_x_data = [particles(1,i_particle).T_x];
-%         trajectory_y_data = [particles(1,i_particle).T_y];
-%         set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
+        trajectory_x_data = [particles(1,i_particle).T_x];
+        trajectory_y_data = [particles(1,i_particle).T_y];
+        set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
     end    
     x_prev = x;
     y_prev = y;
     
-    initial_sample = step_events(i_stride);
-    final_sample = step_events(i_stride + 1) - 1;
+    initial_sample = step_events(i_stride-1);
+    final_sample = step_events(i_stride);
+    
+    % Do not receive data while standing or sitting
+    if (final_sample - initial_sample) > 615
+        initial_sample = final_sample - 410;
+    end        
+    
     % UPDATE
     rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample),...
             rssi_bathroom(initial_sample:final_sample), rssi_dining(initial_sample:final_sample),...
@@ -92,7 +99,7 @@ for i_stride=1:length(positions)
         
             for j_rssi=non_zero_indexes
                 rssi = rssis(i_rssis,j_rssi);
-                if (rssi ~=0) && (rssi > -88)
+                if (rssi ~=0) && (rssi > -85)
 
                     [particles, particles_weights] = update(particles, rssi, j_rssi, particles_weights, N_PARTICLES);
 
@@ -191,9 +198,9 @@ function [new_particles, new_particles_weights, trajectories] = resample_from_in
         new_particles(1,i_particle).W = 1 / N_PARTICLES;
         new_particles_weights(i_particle) = 1 / N_PARTICLES;%%
         
-        trajectory_x_data = [new_particles(1,i_particle).T_x];
-        trajectory_y_data = [new_particles(1,i_particle).T_y];
-        set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
+%         trajectory_x_data = [new_particles(1,i_particle).T_x];
+%         trajectory_y_data = [new_particles(1,i_particle).T_y];
+%         set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
     end
 end
 

@@ -150,7 +150,7 @@ end
 
 
 %Rotate position estimates and plot.
-angle = -80; % Rotation angle required to achieve an aesthetic alignment of the figure.
+angle = -67; % Rotation angle required to achieve an aesthetic alignment of the figure. -80 p11
 rotation_matrix = [cosd(angle) -sind(angle);
     sind(angle) cosd(angle)];
 pos_r = zeros(2,length(pos_n));

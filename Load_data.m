@@ -2,7 +2,6 @@ function [positions, Step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, bea
 
 
 %% Load files
-stance_phase = load(strcat('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\stance_phase_p',int2str(participant),'.mat'));
 Acc_Gyr_Beac_data= readtable(strcat('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\',int2str(participant),'.csv'));
 
 gyro_bias_i_c_s = [820 5500 4000 1 5000 3600 16120 1000 500 4000 1];
@@ -76,15 +75,18 @@ beac_motion = beac_motion(start_sample:final_sample,:);
 %beac_rssi_activity = [zeros(30,5); beac_rssi_activity(start_sample:final_sample - 30,:)];
 %beac_motion = beac_motion(start_sample:final_sample - 30,:);
 
+
+
 % Filtering the beacons data in Python
 [beac_rssi_fixed_filtered, beac_rssi_activity_filtered] = rssiKF(beac_rssi_fixed,beac_rssi_activity);
 
 
 %% -----Step detection---------------------------
 idx_fig=20;
-% [Num_steps,Step_events,StancePhase,idx_fig]=StepDetection_Acel(acc,1,idx_fig);
+[~,Step_events,~,~] = StepDetection_Acel(acc, 0, idx_fig);
 
-Step_events = stance_phase.stance_phase(:,1)';
+%stance_phase = load(strcat('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\stance_phase_p',int2str(participant),'.mat'));
+%Step_events = stance_phase.stance_phase(:,1)';
 
 
 %% -------------------- Trajectory reconstruction ZUPT KF -----------------------%
