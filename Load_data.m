@@ -1,4 +1,4 @@
-function [positions, Step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data(participant)
+function [positions, Step_events, beac_rssi_fixed_filtered, beac_rssi_activity_filtered, beac_motion] = Load_data(participant)
 
 
 %% Load files
@@ -90,7 +90,7 @@ idx_fig=20;
 
 
 %% -------------------- Trajectory reconstruction ZUPT KF -----------------------%
-[positions]=ZUPT_KF(acc, gyr_unbiased, gravity, acc_mean, fs, Step_events, idx_fig+4);
-
+[positions]=ZUPT_KF(acc, gyr_unbiased, gravity, acc_mean, fs, Step_events, participant, idx_fig+4);
+end
 
     

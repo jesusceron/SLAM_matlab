@@ -1,4 +1,4 @@
-function [positions]=ZUPT_KF(acc, gyr_unbiased, g, acc_mean, fs, Step_events, idx_fig)
+function [positions]=ZUPT_KF(acc, gyr_unbiased, g, acc_mean, fs, Step_events, participant, idx_fig)
 %% Read data from file.
 % Data should include timestamps (seconds), 3 axis accelerations (m/s^2), 3
 % axis gyroscopic rates of turn (rad/s).
@@ -150,7 +150,8 @@ end
 
 
 %Rotate position estimates and plot.
-angle = -67; % Rotation angle required to achieve an aesthetic alignment of the figure. -80 p11
+angles = [-65 -130 -75 -75 -75 -65 0 -75 -50 -165 -80]; % Rotation angle required to achieve an aesthetic alignment of the figure.
+angle = angles(participant);
 rotation_matrix = [cosd(angle) -sind(angle);
     sind(angle) cosd(angle)];
 pos_r = zeros(2,length(pos_n));
@@ -224,3 +225,4 @@ end
 % ylim(ylim(ax1));
 % ylabel('Floor');
 % hold off;
+end

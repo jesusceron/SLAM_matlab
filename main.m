@@ -1,41 +1,38 @@
 clc;
-clearvars -except positions step_events beac_rssi_fixed beac_rssi_fixed_filtered beac_rssi_activity beac_rssi_activity_filtered
+clearvars -except positions step_events beac_rssi_fixed_filtered beac_rssi_activity_filtered beac_motion
 close all;
 
 participant = 1;
 
-N_PARTICLES = 200;
-N_LM = 8;
+N_PARTICLES = 500;
+N_LM = 10;
 LM_SIZE = 2;
 THRESHOLD_RESAMPLE = N_PARTICLES / 2;
 STD_PERSON_POSITION = 0.1;
 
-[positions, step_events, beac_rssi_fixed, beac_rssi_fixed_filtered, beac_rssi_activity, beac_rssi_activity_filtered] = Load_data(participant);
-step_events = [1, step_events, length(beac_rssi_fixed)]; % Add '1' and the lenght of the dataset as points of support
+% [positions, step_events,beac_rssi_fixed_filtered, beac_rssi_activity_filtered, beac_motion] = Load_data(participant);
+% step_events = [1, step_events, length(beac_motion)]; % Add '1' and the lenght of the dataset as points of support
 
-rssi_room_unfiltered = beac_rssi_fixed(:,1);
-rssi_kitchen_unfiltered = beac_rssi_fixed(:,2);
-rssi_bathroom_unfiltered = beac_rssi_fixed(:,3);
-rssi_dining_unfiltered = beac_rssi_fixed(:,4);
-rssi_living_unfiltered = beac_rssi_fixed(:,5);
+
 rssi_room = beac_rssi_fixed_filtered(:,1);
 rssi_kitchen = beac_rssi_fixed_filtered(:,2);
 rssi_bathroom = beac_rssi_fixed_filtered(:,3);
 rssi_dining = beac_rssi_fixed_filtered(:,4);
 rssi_living = beac_rssi_fixed_filtered(:,5);
 
-rssi_door_unfiltered = beac_rssi_activity(:,1);
-rssi_toilet_unfiltered = beac_rssi_activity(:,2);
-rssi_broom_unfiltered = beac_rssi_activity(:,3);
-rssi_pitcher_unfiltered = beac_rssi_activity(:,4);
-rssi_brush_unfiltered = beac_rssi_activity(:,5);
 rssi_door = beac_rssi_activity_filtered(:,1);
 rssi_toilet = beac_rssi_activity_filtered(:,2);
 rssi_broom = beac_rssi_activity_filtered(:,3);
 rssi_pitcher = beac_rssi_activity_filtered(:,4);
 rssi_brush = beac_rssi_activity_filtered(:,5);
 
-beacon_fixed = [1,1,1,1,1,1,1,1,1,1];
+door_moving = beac_motion(:,1);
+toilet_moving = beac_motion(:,2);
+broom_moving = beac_motion(:,3);
+moving_window = 0;
+pitcher_moving = beac_motion(:,4);
+brush_moving = beac_motion(:,5);
+
 
 %% CREATION OF PARTICLES
 particles = [];
@@ -59,13 +56,15 @@ x_prev = positions(1, 1);
 y_prev = positions(1, 2);
 for i_stride=2:length(positions)
     disp(i_stride);
+    
     % PREDICTION
+    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     x = positions(i_stride, 1);
     y = positions(i_stride, 2);
     for i_particle=1:N_PARTICLES
-
-        dist_x = (x - x_prev) + randn() * STD_PERSON_POSITION;
-        dist_y = (y - y_prev) + randn() * STD_PERSON_POSITION;
+        
+        dist_x = (x - x_prev) + randn() * STD_PERSON_POSITION; % randn()=-1.2849
+        dist_y = (y - y_prev) + randn() * STD_PERSON_POSITION; % randn()=-0.1054
         particles(1,i_particle).X = particles(i_particle).X + dist_x;
         particles(1,i_particle).Y = particles(i_particle).Y + dist_y;
         
@@ -75,49 +74,68 @@ for i_stride=2:length(positions)
         trajectory_x_data = [particles(1,i_particle).T_x];
         trajectory_y_data = [particles(1,i_particle).T_y];
         set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
-    end    
+    end
     x_prev = x;
     y_prev = y;
+    pause(0.05)
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
+    % UPDATE
     initial_sample = step_events(i_stride-1);
     final_sample = step_events(i_stride);
     
-    % Do not receive data while standing or sitting
+    % Do not include RSSI measurements while person is still
     if (final_sample - initial_sample) > 615
         initial_sample = final_sample - 410;
-    end        
+    end
     
-    % UPDATE
-    rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample),...
-            rssi_bathroom(initial_sample:final_sample), rssi_dining(initial_sample:final_sample),...
-            rssi_living(initial_sample:final_sample), rssi_door(initial_sample:final_sample),...
-            rssi_toilet(initial_sample:final_sample), rssi_brush(initial_sample:final_sample)];
-
+    beac_moving = [door_moving(initial_sample:final_sample), toilet_moving(initial_sample:final_sample), broom_moving(initial_sample:final_sample),...
+        pitcher_moving(initial_sample:final_sample), brush_moving(initial_sample:final_sample)];
+    
+    rssis = [rssi_door(initial_sample:final_sample), rssi_toilet(initial_sample:final_sample), rssi_broom(initial_sample:final_sample),...
+        rssi_pitcher(initial_sample:final_sample), rssi_brush(initial_sample:final_sample),...
+        rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample), rssi_bathroom(initial_sample:final_sample),...
+        rssi_dining(initial_sample:final_sample), rssi_living(initial_sample:final_sample)];
+    
     for i_rssis=1:size(rssis,1)
         non_zero_indexes = find(rssis(i_rssis,:));
         if ~isempty(non_zero_indexes)
-        
+            
             for j_rssi=non_zero_indexes
                 rssi = rssis(i_rssis,j_rssi);
-                if (rssi ~=0) && (rssi > -85)
-
-                    [particles, particles_weights] = update(particles, rssi, j_rssi, particles_weights, N_PARTICLES);
-
-                    % RESAMPLE
-                    neff = 1 / sum(sqrt(particles_weights));
-                    if neff < THRESHOLD_RESAMPLE
-                        %indexes = double(py.mifunc.stratified_resample(particles_weights))+1;
-                        indexes = double(py.mifunc.systematic_resample(particles_weights))+1;
-                        [particles, particles_weights, trajectories] = resample_from_index(particles, particles_weights, indexes, N_PARTICLES, trajectories);
-                        %particles_weights = ones(1,N_PARTICLES) / N_PARTICLES; % PARTICLES WEIGHTS ARE INITILIZED TO AND EQUAL VALUE
+                current_sample = (initial_sample -1 +i_rssis);
+                
+                if rssi > -85
+                    
+                    switch j_rssi
                         
+                        case 3 % broom
+                            
+                            moving = beac_moving(i_rssis,j_rssi);
+                            % Do not update the beacon landmark during 3 second after a movement being detected.
+                            if moving
+                                moving_window = initial_sample - 1 + i_rssis + 615;
+                                continue
+                            end
+                            if moving_window > current_sample
+                                continue
+                            end
+                            
+                            % Beacon is still, update landmark
+                            [particles, particles_weights, trajectories] = ...
+                                update_resample(particles, rssi, j_rssi, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE);
+                            
+                        otherwise
+                            
+                            [particles, particles_weights, trajectories] = ...
+                                update_resample(particles, rssi, j_rssi, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE);
+                            
                     end
-
                 end
             end
         end
     end
-        
+    
 end
 
 
@@ -126,6 +144,21 @@ for i_lm=1:N_LM
     plot(particles(1,1).Lm(i_lm,1),particles(1,1).Lm(i_lm,2),'d');
 end
 
+function [particles, particles_weights, trajectories] = update_resample(particles, rssi, j_rssi, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE)
+    
+    % To update
+    [particles, particles_weights] = update(particles, rssi, j_rssi, particles_weights, N_PARTICLES);
+
+    % To resample
+    neff = 1 / sum(sqrt(particles_weights));
+    if neff < THRESHOLD_RESAMPLE
+        %indexes = double(py.mifunc.stratified_resample(particles_weights))+1;
+        indexes = double(py.mifunc.systematic_resample(particles_weights))+1;
+        [particles, particles_weights, trajectories] = resample_from_index(particles, particles_weights, indexes, N_PARTICLES, trajectories);
+        %particles_weights = ones(1,N_PARTICLES) / N_PARTICLES; % PARTICLES WEIGHTS ARE INITILIZED TO AND EQUAL VALUE
+
+    end
+end
 
 function [particles, particles_weights] = update(particles, rssi, lm_id, particles_weights, N_PARTICLES)
     
@@ -198,10 +231,12 @@ function [new_particles, new_particles_weights, trajectories] = resample_from_in
         new_particles(1,i_particle).W = 1 / N_PARTICLES;
         new_particles_weights(i_particle) = 1 / N_PARTICLES;%%
         
-%         trajectory_x_data = [new_particles(1,i_particle).T_x];
-%         trajectory_y_data = [new_particles(1,i_particle).T_y];
-%         set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
+        trajectory_x_data = [new_particles(1,i_particle).T_x];
+        trajectory_y_data = [new_particles(1,i_particle).T_y];
+        set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data);
+        plot(particles(1,1).Lm(i_lm,1),particles(1,1).Lm(i_lm,2),'d');
     end
+    pause(0.05)
 end
 
 
