@@ -2,13 +2,13 @@ clc;
 clearvars -except positions step_events beac_rssi_fixed_filtered beac_rssi_activity_filtered beac_motion
 close all;
 
-participant = 10;
-
-N_PARTICLES = 500;
+participant = 1;
+% do not use 4,6,7
+N_PARTICLES = 3000;
 N_LM = 10;
 LM_SIZE = 2;
 THRESHOLD_RESAMPLE = N_PARTICLES / 2;
-STD_PERSON_POSITION = 0.3;
+STD_PERSON_POSITION = 0.05;
 
 [positions, step_events,beac_rssi_fixed_filtered, beac_rssi_activity_filtered, beac_motion] = Load_data(participant);
 step_events = [1, step_events, length(beac_motion)]; % Add '1' and the lenght of the dataset as points of support
@@ -127,7 +127,7 @@ for i_stride=2:length(positions)
             switch i_beac_moving
                 case 1 % door
                     
-                    if final_sample - sample_movement_door > 600
+                    if final_sample - sample_movement_door > 6000
                         
                         sample_movement_door = final_sample;
                         rssi = -60;
@@ -159,7 +159,7 @@ for i_stride=2:length(positions)
                     
                 case 4 % pitcher
                     
-                    if final_sample - sample_movement_pitcher > 600
+                    if final_sample - sample_movement_pitcher > 6000
                         
                         sample_movement_pitcher = final_sample;
                         rssi = -60;
@@ -183,7 +183,7 @@ for i_stride=2:length(positions)
     
     rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample), rssi_bathroom(initial_sample:final_sample),...
         rssi_dining(initial_sample:final_sample), rssi_living(initial_sample:final_sample)];
-    
+     
     for i_rssis=1:size(rssis,1)
         non_zero_indexes = find(rssis(i_rssis,:));
         if ~isempty(non_zero_indexes)
@@ -201,14 +201,43 @@ for i_stride=2:length(positions)
             end
         end
     end
+
+%     [~,~,rssis_room] = find(rssi_room(initial_sample:final_sample));
+%     [~,~,rssis_kitchen] = find(rssi_kitchen(initial_sample:final_sample));
+%     [~,~,rssis_bathroom] = find(rssi_bathroom(initial_sample:final_sample));
+%     [~,~,rssis_dining] = find(rssi_dining(initial_sample:final_sample));
+%     [~,~,rssis_living] = find(rssi_living(initial_sample:final_sample));
+%     beacons_rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample),...
+%             rssi_bathroom(initial_sample:final_sample), rssi_dining(initial_sample:final_sample),...
+%             rssi_living(initial_sample:final_sample)];
+% 
+%     for i_beacon=1:5
+%         
+%         [~,~,beacon_rssis] = find(beacons_rssis(:,i_beacon));
+%         
+%     if ~isempty(beacon_rssis)
+% 
+%             rssi = mean(beacon_rssis);
+% 
+%             if rssi >-90
+%                 [particles, particles_weights, trajectories, current_best_particle] = ...
+%                     update_resample(particles, rssi, i_beacon+5, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
+%             end
+% 
+%     end
+%     end
+
+    
     
 end
 
 
-for i_lm=1:N_LM
-    hold on
-    plot(particles(1,1).Lm(i_lm,1),particles(1,1).Lm(i_lm,2),'d');
-end
+
+
+% for i_lm=1:N_LM
+%     hold on
+%     plot(particles(1,1).Lm(i_lm,1),particles(1,1).Lm(i_lm,2),'d');
+% end
 
 function [particles, particles_weights, trajectories, current_best_particle] = ...
     update_resample(particles, rssi, j_rssi, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle)
