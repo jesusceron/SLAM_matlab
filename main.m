@@ -1,18 +1,23 @@
 clc;
-clearvars -except positions step_events beac_rssi_fixed_filtered beac_rssi_activity_filtered beac_motion
+clearvars -except positions step_events beac_rssi_fixed_filtered beac_rssi_activity_filtered beac_motion trajectory_parts
 close all;
 
-participant = 1;
+participant = 2;
 % do not use 4,6,7
-N_PARTICLES = 3000;
+N_PARTICLES = 5;
 N_LM = 10;
 LM_SIZE = 2;
 THRESHOLD_RESAMPLE = N_PARTICLES / 2;
-STD_PERSON_POSITION = 0.05;
+STD_PERSON_POSITION = 0.1;
+
 
 [positions, step_events,beac_rssi_fixed_filtered, beac_rssi_activity_filtered, beac_motion] = Load_data(participant);
 step_events = [1, step_events, length(beac_motion)]; % Add '1' and the lenght of the dataset as points of support
 
+
+% Get strides where the beacons are moved. That indicates that is the
+% begining of a new trajectory
+[trajectory_parts] = GetTrajectoryParts(beac_motion,step_events);
 
 rssi_room = beac_rssi_fixed_filtered(:,1);
 rssi_kitchen = beac_rssi_fixed_filtered(:,2);
@@ -26,29 +31,6 @@ rssi_broom = beac_rssi_activity_filtered(:,3);
 rssi_pitcher = beac_rssi_activity_filtered(:,4);
 rssi_brush = beac_rssi_activity_filtered(:,5);
 
-door_moving = [beac_motion(610:end,1); zeros(609,1)];
-sample_movement_door = 0;
-
-toilet_moving = [beac_motion(610:end,2); zeros(609,1)];
-sample_movement_toilet = 0;
-
-broom_moving = [beac_motion(610:end,3); zeros(609,1)];
-sample_movement_broom = 0;
-first_time_moved_broom = true;
-
-pitcher_moving = [beac_motion(610:end,4); zeros(609,1)];
-sample_movement_pitcher = 0;
-
-brush_moving = [beac_motion(610:end,5); zeros(609,1)];
-sample_movement_brush = 0;
-
-
-%% CREATION OF PARTICLES
-particles = [];
-trajectories = cell(1,N_PARTICLES);
-landmarks_figures = cell(1,N_LM);
-particles_weights = ones(1,N_PARTICLES) / N_PARTICLES;
-
 
 figure
 xlim([0,20])
@@ -56,179 +38,199 @@ ylim([0, 11])
 map
 hold on
 grid on
-for i_particle=1:N_PARTICLES
-    particles = [particles, Particle(N_PARTICLES,N_LM,LM_SIZE)];
-    trajectory = plot(nan, nan, 'color', [.9 .9 .9]);
-    trajectories{i_particle} = trajectory;
-end
-for i_landmark=1:N_LM
-    landmark_figure = plot(nan, nan,'d');
-    landmarks_figures{i_landmark} = landmark_figure;
-end
 
-particles = init_beacons_position(particles,N_PARTICLES);
-current_best_particle = N_PARTICLES;
-previous_best_particle = N_PARTICLES;
 
 %% MAIN LOOP
-x_prev = positions(1, 1);
-y_prev = positions(1, 2);
-for i_stride=2:length(positions)
-    disp(i_stride);
+
+for i_trajectory=1:size(trajectory_parts,1)
+        
+    x_initial = trajectory_parts(i_trajectory,3);
+    y_initial = trajectory_parts(i_trajectory,4);
+    initial_step = trajectory_parts(i_trajectory,1);
+    final_step = trajectory_parts(i_trajectory,2);
     
-    % PREDICTION
-    % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    x = positions(i_stride, 1);
-    y = positions(i_stride, 2);
+    pos_trajectory_part = positions(initial_step: final_step,:);
+        
+    correction_x = pos_trajectory_part(1, 1) - x_initial;
+    correction_y = pos_trajectory_part(1, 2) - y_initial;
+    
+    pos_trajectory_part(:, 1:2) = pos_trajectory_part(: ,1:2) - [correction_x correction_y];
+
+    
+    % CREATION OF PARTICLES
+    particles = [];
+    trajectories = cell(1,N_PARTICLES);
+    landmarks_figures = cell(1,N_LM);
+    particles_weights = ones(1,N_PARTICLES) / N_PARTICLES;
     for i_particle=1:N_PARTICLES
-        
-        dist_x = (x - x_prev) + randn() * STD_PERSON_POSITION;
-        dist_y = (y - y_prev) + randn() * STD_PERSON_POSITION;
-        particles(1,i_particle).X = particles(i_particle).X + dist_x;
-        particles(1,i_particle).Y = particles(i_particle).Y + dist_y;
-        
-        particles(1,i_particle).T_x = [particles(1,i_particle).T_x, particles(1,i_particle).X];
-        particles(1,i_particle).T_y = [particles(1,i_particle).T_y, particles(1,i_particle).Y];
-        
-        trajectory_x_data = [particles(1,i_particle).T_x];
-        trajectory_y_data = [particles(1,i_particle).T_y];
-
-        set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data, 'color', [.9 .9 .9]);
-        
+        particles = [particles, Particle(N_PARTICLES,N_LM,LM_SIZE, x_initial, y_initial)];
+        trajectory = plot(nan, nan, 'color', [.9 .9 .9]);
+        trajectories{i_particle} = trajectory;
+    end
+    for i_landmark=1:N_LM
+        landmark_figure = plot(nan, nan,'d');
+        landmarks_figures{i_landmark} = landmark_figure;
     end
     
-    set(trajectories{current_best_particle},'color', 'b');
-    
-    % Plot the landmarks of the best particle.
-    for i_lm=1:N_LM
-        hold on
-        set(landmarks_figures{i_lm},'XData',particles(1,current_best_particle).Lm(i_lm,1), 'YData',particles(1,current_best_particle).Lm(i_lm,2));
-    end
-
-    x_prev = x;
-    y_prev = y;
-    pause(0.05)
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    % UPDATE
-    initial_sample = step_events(i_stride-1);
-    final_sample = step_events(i_stride);
-    
-    % Do not include RSSI measurements while person is still
-    if (final_sample - initial_sample) > 615
-        initial_sample = final_sample - 410;
-    end
-    
-    beac_moving = [door_moving(initial_sample:final_sample), toilet_moving(initial_sample:final_sample), broom_moving(initial_sample:final_sample),...
-        pitcher_moving(initial_sample:final_sample), brush_moving(initial_sample:final_sample)];
-    
-    for i_beac_moving=1:size(beac_moving,2)
-        if ~isempty(find(beac_moving(:,i_beac_moving), 1))
-            switch i_beac_moving
-                case 1 % door
-                    
-                    if final_sample - sample_movement_door > 6000
-                        
-                        sample_movement_door = final_sample;
-                        rssi = -60;
-                        [particles, particles_weights, trajectories, current_best_particle] = ...
-                            update_resample(particles, rssi, i_beac_moving, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
-                    end
-                    
-                case 2 % toilet
-                    
-                    if final_sample - sample_movement_toilet > 600
-                        
-                        sample_movement_toilet = final_sample;
-                        rssi = -60;
-                        [particles, particles_weights, trajectories, current_best_particle] = ...
-                            update_resample(particles, rssi, i_beac_moving, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
-                    end
-                    
-                case 3 % broom
-                    if first_time_moved_broom
-                        first_time_moved_broom = false;
-                        if final_sample - sample_movement_broom > 600
-                            
-                            sample_movement_broom = final_sample;
-                            rssi = -60;
-                            [particles, particles_weights, trajectories, current_best_particle] = ...
-                                update_resample(particles, rssi, i_beac_moving, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
-                        end
-                    end
-                    
-                case 4 % pitcher
-                    
-                    if final_sample - sample_movement_pitcher > 6000
-                        
-                        sample_movement_pitcher = final_sample;
-                        rssi = -60;
-                        [particles, particles_weights, trajectories, current_best_particle] = ...
-                            update_resample(particles, rssi, i_beac_moving, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
-                    end
-                    
-                case 5 % brush
-                    
-                    if final_sample - sample_movement_brush > 600
-                        
-                        sample_movement_brush = final_sample;
-                        rssi = -60;
-                        [particles, particles_weights, trajectories, current_best_particle] = ...
-                            update_resample(particles, rssi, i_beac_moving, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
-                    end
-            end
-        end
-    end
+    particles = init_beacons_position(particles,N_PARTICLES);
+    current_best_particle = N_PARTICLES;
+    previous_best_particle = N_PARTICLES;
     
     
-    rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample), rssi_bathroom(initial_sample:final_sample),...
-        rssi_dining(initial_sample:final_sample), rssi_living(initial_sample:final_sample)];
-     
-    for i_rssis=1:size(rssis,1)
-        non_zero_indexes = find(rssis(i_rssis,:));
-        if ~isempty(non_zero_indexes)
+    
+    for i_step=2:size(pos_trajectory_part,1)
+        disp(i_step)
+        % PREDICTION
+        % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        x = pos_trajectory_part(i_step, 1);
+        y = pos_trajectory_part(i_step, 2);
+        for i_particle=1:N_PARTICLES
             
-            for j_rssi=non_zero_indexes
-                rssi = rssis(i_rssis,j_rssi);
-                current_sample = (initial_sample -1 +i_rssis);
+            dist_x = (x - x_initial) + randn() * STD_PERSON_POSITION;
+            dist_y = (y - y_initial) + randn() * STD_PERSON_POSITION;
+            particles(1,i_particle).X = particles(i_particle).X + dist_x;
+            particles(1,i_particle).Y = particles(i_particle).Y + dist_y;
+            
+            particles(1,i_particle).T_x = [particles(1,i_particle).T_x, particles(1,i_particle).X];
+            particles(1,i_particle).T_y = [particles(1,i_particle).T_y, particles(1,i_particle).Y];
+            
+            trajectory_x_data = [particles(1,i_particle).T_x];
+            trajectory_y_data = [particles(1,i_particle).T_y];
+            
+            set(trajectories{i_particle},'XData',trajectory_x_data, 'YData',trajectory_y_data, 'color', [.9 .9 .9]);
+            
+        end
+        
+        set(trajectories{current_best_particle},'color', 'b');
+        
+        % Plot the landmarks of the best particle.
+        for i_lm=1:N_LM
+            hold on
+            set(landmarks_figures{i_lm},'XData',particles(1,current_best_particle).Lm(i_lm,1), 'YData',particles(1,current_best_particle).Lm(i_lm,2));
+        end
+        
+        x_initial = x;
+        y_initial = y;
+        pause(0.05)
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
+        % UPDATE
+        initial_sample = step_events(i_step-1);
+        final_sample = step_events(i_step);
+        % Do not include RSSI measurements while person is still
+        if (final_sample - initial_sample) > 1024
+            initial_sample = final_sample - 1024;
+        end
+        
+        rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample), rssi_bathroom(initial_sample:final_sample),...
+            rssi_dining(initial_sample:final_sample), rssi_living(initial_sample:final_sample)];
+        
+        for i_rssis=1:size(rssis,1)
+            non_zero_indexes = find(rssis(i_rssis,:));
+            if ~isempty(non_zero_indexes)
                 
-                if rssi >-85
-                    [particles, particles_weights, trajectories, current_best_particle] = ...
-                        update_resample(particles, rssi, j_rssi+5, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
+                for j_rssi=non_zero_indexes
+                    rssi = rssis(i_rssis,j_rssi);
+                    current_sample = (initial_sample -1 +i_rssis);
+                    
+                    if rssi >-85
+                        [particles, particles_weights, trajectories, current_best_particle] = ...
+                            update_resample(particles, rssi, j_rssi+5, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
+                    end
+                    
+                    
                 end
-                
-                
             end
         end
+        
+        
+        
+        %             %%%%%% DETECTION OF BEACONS' MOVEMENT TO RESET LOCATION %%%%%%%%%%%%%%
+        %             beac_moving = [door_moving(initial_sample:final_sample), toilet_moving(initial_sample:final_sample), broom_moving(initial_sample:final_sample),...
+        %                 pitcher_moving(initial_sample:final_sample), brush_moving(initial_sample:final_sample)];
+        %
+        %             for i_beac_moving=1:size(beac_moving,2)
+        %                 if ~isempty(find(beac_moving(:,i_beac_moving), 1))
+        %                     switch i_beac_moving
+        %                         case 1 % door
+        %                             if ~door_already_detected
+        %                                 initial_stride = i_stride;
+        %                                 correction_x_door = positions(initial_stride, 1) - 5.4;
+        %                                 correction_y_door = positions(initial_stride, 2) - 5.5;
+        %                                 positions(initial_stride:end,1) = positions(initial_stride:end,1) -correction_x_door;
+        %                                 positions(initial_stride:end,2) = positions(initial_stride:end,2) -correction_y_door;
+        %                                 x_prev = 5.4;
+        %                                 y_prev = 5.5;
+        %                                 no_movement = false;
+        %                                 door_already_detected = true;
+        %                                 break
+        %                             end
+        %
+        %                         case 2 % toilet
+        %
+        %                             if ~toilet_already_detected
+        %                                 initial_stride = i_stride;
+        %                                 correction_x_toilet = positions(initial_stride, 1) - 9;
+        %                                 correction_y_toilet = positions(initial_stride, 2) - 8.2;
+        %                                 positions(initial_stride:end,1) = positions(initial_stride:end,1) -correction_x_toilet;
+        %                                 positions(initial_stride:end,2) = positions(initial_stride:end,2) -correction_y_toilet;
+        %                                 x_prev = 9;
+        %                                 y_prev = 8.2;
+        %                                 no_movement = false;
+        %                                 toilet_already_detected = true;
+        %                                 break
+        %                             end
+        %
+        %                         case 3 % broom
+        %                              if ~broom_already_detected
+        %                                 initial_stride = i_stride;
+        %                                 correction_x_broom = positions(initial_stride, 1) - 7.2;
+        %                                 correction_y_broom = positions(initial_stride, 2) - 8.2;
+        %                                 positions(initial_stride:end,1) = positions(initial_stride:end,1) -correction_x_broom;
+        %                                 positions(initial_stride:end,2) = positions(initial_stride:end,2) -correction_y_broom;
+        %                                 x_prev = 7.2;
+        %                                 y_prev = 8.2;
+        %                                 no_movement = false;
+        %                                 broom_already_detected = true;
+        %                                 break
+        %                             end
+        %
+        %                         case 4 % pitcher
+        %
+        %                             if ~pitcher_already_detected
+        %                                 initial_stride = i_stride;
+        %                                 correction_x_pitcher = positions(initial_stride, 1) - 13.4;
+        %                                 correction_y_pitcher = positions(initial_stride, 2) - 7.3;
+        %                                 positions(initial_stride:end,1) = positions(initial_stride:end,1) - correction_x_pitcher;
+        %                                 positions(initial_stride:end,2) = positions(initial_stride:end,2) - correction_y_pitcher;
+        %                                 x_prev = 13.4;
+        %                                 y_prev = 7.3;
+        %                                 no_movement = false;
+        %                                 pitcher_already_detected = true;
+        %                                 break
+        %                             end
+        %
+        %                         case 5 % brush
+        %
+        %                             if ~brush_already_detected
+        %                                 initial_stride = i_stride;
+        %                                 correction_x_brush = positions(initial_stride, 1) - 9;
+        %                                 correction_y_brush = positions(initial_stride, 2) - 6.3;
+        %                                 positions(initial_stride:end,1) = positions(initial_stride:end,1) -correction_x_brush;
+        %                                 positions(initial_stride:end,2) = positions(initial_stride:end,2) -correction_y_brush;
+        %                                 x_prev = 9;
+        %                                 y_prev = 6.3;
+        %                                 no_movement = false;
+        %                                 brush_already_detected = true;
+        %                                 break
+        %                             end
+        %                     end
+        %                 end
+        %             end
+        
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        
     end
-
-%     [~,~,rssis_room] = find(rssi_room(initial_sample:final_sample));
-%     [~,~,rssis_kitchen] = find(rssi_kitchen(initial_sample:final_sample));
-%     [~,~,rssis_bathroom] = find(rssi_bathroom(initial_sample:final_sample));
-%     [~,~,rssis_dining] = find(rssi_dining(initial_sample:final_sample));
-%     [~,~,rssis_living] = find(rssi_living(initial_sample:final_sample));
-%     beacons_rssis = [rssi_room(initial_sample:final_sample), rssi_kitchen(initial_sample:final_sample),...
-%             rssi_bathroom(initial_sample:final_sample), rssi_dining(initial_sample:final_sample),...
-%             rssi_living(initial_sample:final_sample)];
-% 
-%     for i_beacon=1:5
-%         
-%         [~,~,beacon_rssis] = find(beacons_rssis(:,i_beacon));
-%         
-%     if ~isempty(beacon_rssis)
-% 
-%             rssi = mean(beacon_rssis);
-% 
-%             if rssi >-90
-%                 [particles, particles_weights, trajectories, current_best_particle] = ...
-%                     update_resample(particles, rssi, i_beacon+5, particles_weights, N_PARTICLES, trajectories, THRESHOLD_RESAMPLE, previous_best_particle);
-%             end
-% 
-%     end
-%     end
-
-    
-    
 end
 
 
