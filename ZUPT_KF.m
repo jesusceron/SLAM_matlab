@@ -180,27 +180,28 @@ end
     %map2
     %hold on
     %plot(Thetas(:,1),Positions(:,1),'g');
-    title('Trajectory (ZUPT KF)');
-    xlabel('East (m)');
-    ylabel('North (m)'); 
-    map
-    hold on
-      % Plot in step basis
-    plot(positions(:,1),positions(:,2),'bo-');
-    hold on
-    start = plot(positions(1,1),positions(1,2),'bs','MarkerSize',8,'MarkerFaceColor',[0 0 1]); % marcar posicion inicial
-    stop = plot(positions(end,1),positions(end,2),'bo','MarkerSize',8,'MarkerFaceColor',[0 0 1]); % marcar paso final
-    
-    % Plot in a continous way (complete KF)
-    plot(positions_kf(:,1),positions_kf(:,2),'r');
-    %plot(Positions(:,1),Positions(:,2),'LineWidth',1,'Color','b');
-    start = plot3(positions_kf(1,1),positions_kf(1,2),positions_kf(1,3),'bs');
-    stop = plot3(positions_kf(end,1),positions_kf(end,2),positions_kf(end,3),'bo');
-
-    axis equal
-    grid on;
-    box on;
-    hold off;
+%     figure(123)
+%     title('Trajectory (ZUPT KF)');
+%     xlabel('East (m)');
+%     ylabel('North (m)'); 
+%     map
+%     hold on
+%       % Plot in step basis
+%     plot(positions(:,1),positions(:,2),'bo-');
+%     hold on
+%     start = plot(positions(1,1),positions(1,2),'bs','MarkerSize',8,'MarkerFaceColor',[0 0 1]); % marcar posicion inicial
+%     stop = plot(positions(end,1),positions(end,2),'bo','MarkerSize',8,'MarkerFaceColor',[0 0 1]); % marcar paso final
+%     
+%     % Plot in a continous way (complete KF)
+%     plot(positions_kf(:,1),positions_kf(:,2),'r');
+%     %plot(Positions(:,1),Positions(:,2),'LineWidth',1,'Color','b');
+%     start = plot3(positions_kf(1,1),positions_kf(1,2),positions_kf(1,3),'bs');
+%     stop = plot3(positions_kf(end,1),positions_kf(end,2),positions_kf(end,3),'bo');
+% 
+%     axis equal
+%     grid on;
+%     box on;
+%     hold off;
 
 
 %% Plot altitude estimates.

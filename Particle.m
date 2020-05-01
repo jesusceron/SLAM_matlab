@@ -25,8 +25,8 @@ classdef Particle
             for i=1:N_LM
                 obj.LmP{i} = zeros(LM_SIZE, LM_SIZE);
             end
-            obj.T_x = [x];
-            obj.T_y = [y];
+            obj.T_x = x;
+            obj.T_y = y;
             
             
         end

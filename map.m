@@ -23,22 +23,22 @@ rectangle('Position',[5.5 2 12.6 6.6]) % Whole the seminar room
 % rectangle('Position',[-0.65 5 1.3 0.3125])
 
 %zones without use:
-rectangle('Position',[5.5 2 4.3 2.9], 'FaceColor','k')
-rectangle('Position',[5.5 6.3 1.5 2.2], 'FaceColor','k')
+rectangle('Position',[5.5 2 4.3 3], 'FaceColor','k')
+rectangle('Position',[5.5 6.4 1.5 2.2], 'FaceColor','k')
 
 % Room and living room
 rectangle('Position',[11.8 2 0.8 1.8], 'FaceColor','k') % dining table
 rectangle('Position',[13.9 2 0.6 1.4], 'FaceColor','k') % wall btw dining and living room
 rectangle('Position',[15.1 2 1.4 0.6], 'FaceColor','k') % Living table
-rectangle('Position',[13.9 4.5 4.2 0.4], 'FaceColor','k') % wall btw room and living room
-rectangle('Position',[16.5 5.9 1.6 1.6], 'FaceColor','k') % bed
+rectangle('Position',[13.9 4.6 4.2 0.4], 'FaceColor','k') % wall btw room and living room
+rectangle('Position',[16.5 6 1.6 1.6], 'FaceColor','k') % bed
 
 % Kitchen
-rectangle('Position',[8.1 5.9 3.1 0.6], 'FaceColor','k') % Wall btw bathroom-kitchen and main corridor
-rectangle('Position',[12.5 5.9 1.4 0.6], 'FaceColor','k') % Wall btw kitchen and corridor
-rectangle('Position',[9.5 6.5 0.8 1.6], 'FaceColor','k') % Wall btw bathroom and kitchen
-rectangle('Position',[13.1 6.5 0.8 1.6], 'FaceColor','k') % Wall btw kitchen and room
-rectangle('Position',[10.3 7.9 2.8 0.6], 'FaceColor','k') % Tables of the kitchen
+rectangle('Position',[8.1 6 3.1 0.6], 'FaceColor','k') % Wall btw bathroom-kitchen and main corridor
+rectangle('Position',[12.5 6 1.4 0.6], 'FaceColor','k') % Wall btw kitchen and corridor
+rectangle('Position',[9.5 6.6 0.8 1.6], 'FaceColor','k') % Wall btw bathroom and kitchen
+rectangle('Position',[13.1 6.6 0.8 1.6], 'FaceColor','k') % Wall btw kitchen and room
+rectangle('Position',[10.3 8 2.8 0.6], 'FaceColor','k') % Tables of the kitchen
 
 % % Plot fixed Beacons
 % plot(13, 4.4,'^','markerfacecolor','y','MarkerSize',10)  % Room

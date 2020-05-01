@@ -1,7 +1,8 @@
 function [positions, Step_events, beac_rssi_fixed_filtered, beac_rssi_activity_filtered, beac_motion] = Load_data(participant)
 
 
-    %% Load files
+    %% Load files    
+    
     Acc_Gyr_Beac_data= readtable(strcat('E:\Google Drive\IL_HAR_app_Matlab\dataset_synchronized\',int2str(participant),'.csv'));
 
     gyro_bias_i_c_s = [820 5500 4000 1 5000 3600 16120 1000 500 4000 1];
